@@ -1,0 +1,6 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cantieri Manzardo">
+  <rect width="512" height="512" rx="112" fill="#2563eb"/>
+  <rect x="116" y="150" width="280" height="46" rx="13" fill="#ffffff"/>
+  <rect x="116" y="233" width="208" height="46" rx="13" fill="#bfdbfe"/>
+  <rect x="116" y="316" width="150" height="46" rx="13" fill="#fca5a5"/>
+</svg>

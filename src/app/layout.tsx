@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -15,6 +15,14 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Programmazione Cantieri — Ceramiche Manzardo",
   description: "App interna per la programmazione dei cantieri e dei posatori.",
+  manifest: "/manifest.webmanifest",
+  applicationName: "Cantieri",
+  appleWebApp: { capable: true, title: "Cantieri", statusBarStyle: "default" },
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#2563eb",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

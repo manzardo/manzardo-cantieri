@@ -18,7 +18,14 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   applicationName: "Cantieri",
   appleWebApp: { capable: true, title: "Cantieri", statusBarStyle: "default" },
-  icons: { icon: "/icon.svg", apple: "/icon.svg" },
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {

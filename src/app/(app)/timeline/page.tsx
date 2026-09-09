@@ -21,7 +21,28 @@ const GAP = 4;
 const ROSSO = "#dc2626"; // colore ferie / indisponibilità
 const GIORNI_AVVISO = 20; // avviso: posa entro N giorni con prerequisiti mancanti (§4.6)
 
-type Posatore = { id: string; nome: string; colore: string };
+// Ordine con cui le categorie di artigiani compaiono nella timeline.
+// Per aggiungere o rinominare una categoria basta toccare questo elenco
+// (e il campo "mestiere" dei posatori nel database).
+const ORDINE_MESTIERI = [
+  "Piastrellista",
+  "Parquettista",
+  "Muratore",
+  "Idraulico",
+  "Elettricista",
+  "Cartongessista/Pittore",
+  "Montatore box doccia",
+];
+
+// Peso per l'ordinamento: prima le categorie dell'elenco qui sopra,
+// poi eventuali categorie nuove, e per ultimi i "Da classificare".
+function pesoMestiere(m: string): number {
+  if (m === "Da classificare") return 999;
+  const i = ORDINE_MESTIERI.indexOf(m);
+  return i === -1 ? 500 : i;
+}
+
+type Posatore = { id: string; nome: string; colore: string; mestiere: string };
 type Cantiere = { id: string; cliente: string };
 type Assegnazione = {
   id: string;
@@ -108,7 +129,11 @@ export default function TimelinePage() {
     const { data: sess } = await supabase.auth.getSession();
     setUtente(sess.session?.user.email ?? "");
     const [p, c, a] = await Promise.all([
-      supabase.from("posatori").select("id, nome, colore").eq("attivo", true).order("nome"),
+      supabase
+        .from("posatori")
+        .select("id, nome, colore, mestiere")
+        .eq("attivo", true)
+        .order("nome"),
       supabase.from("cantieri").select("id, cliente").order("cliente"),
       supabase
         .from("assegnazioni")
@@ -216,6 +241,23 @@ export default function TimelinePage() {
   }, [posatori, assegnazioni, indisponibilita, inizio]);
 
   const conflitti = righe.filter((r) => r.rangeConflitti.length > 0);
+
+  // Le righe divise per categoria: piastrellisti insieme, muratori insieme, ecc.
+  const gruppi = useMemo(() => {
+    const mappa = new Map<string, Riga[]>();
+    for (const r of righe) {
+      const m = r.pos.mestiere || "Da classificare";
+      if (!mappa.has(m)) mappa.set(m, []);
+      mappa.get(m)!.push(r);
+    }
+    return [...mappa.entries()]
+      .map(([mestiere, elenco]) => ({ mestiere, elenco }))
+      .sort(
+        (a, b) =>
+          pesoMestiere(a.mestiere) - pesoMestiere(b.mestiere) ||
+          a.mestiere.localeCompare(b.mestiere)
+      );
+  }, [righe]);
 
   // Avvisi: cantieri con posa entro 20 giorni e sopralluogo/merce mancanti.
   const avvisi = useMemo(() => {
@@ -376,95 +418,109 @@ export default function TimelinePage() {
               </div>
             </div>
 
-            {/* Una riga per posatore */}
-            {righe.map((r) => {
-              const altezzaRiga = r.corsie * (ALTEZZA_BLOCCO + GAP) + GAP;
-              return (
-                <div key={r.pos.id} className="flex border-b border-gray-100">
-                  <div
-                    className="sticky left-0 z-10 flex shrink-0 items-center gap-2 border-r border-gray-200 bg-white px-2"
-                    style={{ width: NOME }}
-                  >
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: r.pos.colore }}
-                    />
-                    <span className="truncate text-sm text-gray-800">
-                      {r.pos.nome}
-                    </span>
-                  </div>
+            {/* Le righe, raggruppate per categoria di artigiano */}
+            {gruppi.map((gr) => (
+              <div key={gr.mestiere}>
+                {/* Intestazione della categoria */}
+                <div
+                  className="border-b border-gray-200 bg-gray-100"
+                  style={{ width: NOME + larghezzaGriglia }}
+                >
+                  <span className="sticky left-0 inline-block px-2 py-1 text-xs font-semibold uppercase tracking-wide text-gray-600">
+                    {gr.mestiere} · {gr.elenco.length}
+                  </span>
+                </div>
 
-                  <div
-                    className="relative"
-                    style={{ width: larghezzaGriglia, height: altezzaRiga }}
-                  >
-                    {/* Sfondo: celle dei giorni */}
-                    <div className="absolute inset-0 flex">
-                      {giorni.map((g) => (
+                {gr.elenco.map((r) => {
+                const altezzaRiga = r.corsie * (ALTEZZA_BLOCCO + GAP) + GAP;
+                return (
+                  <div key={r.pos.id} className="flex border-b border-gray-100">
+                    <div
+                      className="sticky left-0 z-10 flex shrink-0 items-center gap-2 border-r border-gray-200 bg-white px-2"
+                      style={{ width: NOME }}
+                    >
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: r.pos.colore }}
+                      />
+                      <span className="truncate text-sm text-gray-800">
+                        {r.pos.nome}
+                      </span>
+                    </div>
+
+                    <div
+                      className="relative"
+                      style={{ width: larghezzaGriglia, height: altezzaRiga }}
+                    >
+                      {/* Sfondo: celle dei giorni */}
+                      <div className="absolute inset-0 flex">
+                        {giorni.map((g) => (
+                          <div
+                            key={g}
+                            className={
+                              "shrink-0 border-r border-gray-100 " +
+                              (g === oggi
+                                ? "bg-blue-50/60"
+                                : isWeekend(g)
+                                ? "bg-gray-50"
+                                : "")
+                            }
+                            style={{ width: CELLA }}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Blocchi (cantieri e ferie) */}
+                      {r.impegni.map((im) => {
+                        const vsInizio = Math.max(0, im.inizioIdx);
+                        const vsFine = Math.min(GIORNI_VISIBILI - 1, im.fineIdx);
+                        const span = vsFine - vsInizio + 1;
+                        const colore = im.tipo === "ferie" ? ROSSO : r.pos.colore;
+                        return (
+                          <button
+                            key={im.tipo + im.id}
+                            onClick={() => setDettaglio(im)}
+                            title={`${im.etichetta} · ${formatData(im.data_inizio)} → ${formatData(im.data_fine)}`}
+                            className={
+                              "absolute overflow-hidden rounded-md px-1.5 text-left text-xs font-medium text-white shadow-sm transition hover:brightness-95 " +
+                              (im.rischio ? "ring-2 ring-amber-400" : "ring-1 ring-black/10")
+                            }
+                            style={{
+                              left: vsInizio * CELLA + 2,
+                              width: span * CELLA - 4,
+                              top: im.corsia * (ALTEZZA_BLOCCO + GAP) + GAP,
+                              height: ALTEZZA_BLOCCO,
+                              lineHeight: `${ALTEZZA_BLOCCO}px`,
+                              backgroundColor: colore,
+                            }}
+                          >
+                            {im.inizioIdx < 0 ? "‹ " : ""}
+                            {im.rischio ? "⚠ " : ""}
+                            {im.etichetta}
+                            {im.fineIdx > GIORNI_VISIBILI - 1 ? " ›" : ""}
+                          </button>
+                        );
+                      })}
+
+                      {/* Evidenza rossa sui giorni di sovrapposizione (sopra i blocchi) */}
+                      {r.rangeConflitti.map((g, i) => (
                         <div
-                          key={g}
-                          className={
-                            "shrink-0 border-r border-gray-100 " +
-                            (g === oggi
-                              ? "bg-blue-50/60"
-                              : isWeekend(g)
-                              ? "bg-gray-50"
-                              : "")
-                          }
-                          style={{ width: CELLA }}
+                          key={"conf" + i}
+                          className="pointer-events-none absolute top-0 rounded-sm ring-2 ring-red-500"
+                          style={{
+                            left: g.start * CELLA,
+                            width: (g.end - g.start + 1) * CELLA,
+                            height: altezzaRiga,
+                            backgroundColor: "rgba(220,38,38,0.28)",
+                          }}
                         />
                       ))}
                     </div>
-
-                    {/* Blocchi (cantieri e ferie) */}
-                    {r.impegni.map((im) => {
-                      const vsInizio = Math.max(0, im.inizioIdx);
-                      const vsFine = Math.min(GIORNI_VISIBILI - 1, im.fineIdx);
-                      const span = vsFine - vsInizio + 1;
-                      const colore = im.tipo === "ferie" ? ROSSO : r.pos.colore;
-                      return (
-                        <button
-                          key={im.tipo + im.id}
-                          onClick={() => setDettaglio(im)}
-                          title={`${im.etichetta} · ${formatData(im.data_inizio)} → ${formatData(im.data_fine)}`}
-                          className={
-                            "absolute overflow-hidden rounded-md px-1.5 text-left text-xs font-medium text-white shadow-sm transition hover:brightness-95 " +
-                            (im.rischio ? "ring-2 ring-amber-400" : "ring-1 ring-black/10")
-                          }
-                          style={{
-                            left: vsInizio * CELLA + 2,
-                            width: span * CELLA - 4,
-                            top: im.corsia * (ALTEZZA_BLOCCO + GAP) + GAP,
-                            height: ALTEZZA_BLOCCO,
-                            lineHeight: `${ALTEZZA_BLOCCO}px`,
-                            backgroundColor: colore,
-                          }}
-                        >
-                          {im.inizioIdx < 0 ? "‹ " : ""}
-                          {im.rischio ? "⚠ " : ""}
-                          {im.etichetta}
-                          {im.fineIdx > GIORNI_VISIBILI - 1 ? " ›" : ""}
-                        </button>
-                      );
-                    })}
-
-                    {/* Evidenza rossa sui giorni di sovrapposizione (sopra i blocchi) */}
-                    {r.rangeConflitti.map((g, i) => (
-                      <div
-                        key={"conf" + i}
-                        className="pointer-events-none absolute top-0 rounded-sm ring-2 ring-red-500"
-                        style={{
-                          left: g.start * CELLA,
-                          width: (g.end - g.start + 1) * CELLA,
-                          height: altezzaRiga,
-                          backgroundColor: "rgba(220,38,38,0.28)",
-                        }}
-                      />
-                    ))}
                   </div>
-                </div>
-              );
-            })}
+                );
+                })}
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -633,11 +689,7 @@ function PannelloAssegna({
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
           >
             <option value="">— scegli —</option>
-            {posatori.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nome}
-              </option>
-            ))}
+            <OpzioniPosatori posatori={posatori} />
           </select>
         </label>
 
@@ -729,11 +781,7 @@ function PannelloFerie({
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
           >
             <option value="">— scegli —</option>
-            {posatori.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nome}
-              </option>
-            ))}
+            <OpzioniPosatori posatori={posatori} />
           </select>
         </label>
 
@@ -964,11 +1012,7 @@ function DettaglioImpegno({
             onChange={(e) => setPosatoreId(e.target.value)}
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
           >
-            {posatori.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nome}
-              </option>
-            ))}
+            <OpzioniPosatori posatori={posatori} />
           </select>
         </label>
       )}
@@ -1048,5 +1092,32 @@ function Modale({
         {children}
       </div>
     </div>
+  );
+}
+
+// Le opzioni della tendina "scegli posatore", raggruppate per categoria.
+// Usata in tutte e tre le tendine della pagina.
+function OpzioniPosatori({ posatori }: { posatori: Posatore[] }) {
+  const mappa = new Map<string, Posatore[]>();
+  for (const p of posatori) {
+    const m = p.mestiere || "Da classificare";
+    if (!mappa.has(m)) mappa.set(m, []);
+    mappa.get(m)!.push(p);
+  }
+  const gruppi = [...mappa.entries()].sort(
+    (a, b) => pesoMestiere(a[0]) - pesoMestiere(b[0]) || a[0].localeCompare(b[0])
+  );
+  return (
+    <>
+      {gruppi.map(([mestiere, elenco]) => (
+        <optgroup key={mestiere} label={mestiere}>
+          {elenco.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nome}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </>
   );
 }

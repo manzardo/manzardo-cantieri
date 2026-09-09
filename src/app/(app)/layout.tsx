@@ -51,6 +51,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const vociMenu = [
     { href: "/timeline", label: "Timeline" },
     { href: "/cantieri", label: "Cantieri" },
+    { href: "/da-assegnare", label: "Da assegnare" },
     { href: "/posatori", label: "Posatori" },
     { href: "/storico", label: "Storico" },
   ];

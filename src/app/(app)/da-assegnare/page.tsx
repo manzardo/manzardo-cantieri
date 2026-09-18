@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { formatData } from "@/lib/date";
+import { formatData, oggiISO, giorniTra } from "@/lib/date";
 
 // Pagina "Da assegnare": i cantieri che non hanno NESSUN posatore assegnato,
 // in nessuna data. Serve a non dimenticarsi di fissare gli artigiani.
@@ -16,6 +16,7 @@ type Cantiere = {
   tipo_lavorazione: string | null;
   note: string | null;
   data_contratto: string | null;
+  data_posa_desiderata: string | null;
   sopralluogo_fatto: boolean;
   merce_ordinata: boolean;
 };
@@ -25,6 +26,8 @@ export default function DaAssegnarePage() {
   const [errore, setErrore] = useState<string | null>(null);
   const [pronto, setPronto] = useState(false);
 
+  const oggi = oggiISO();
+
   useEffect(() => {
     let attivo = true;
 
@@ -33,8 +36,9 @@ export default function DaAssegnarePage() {
         supabase
           .from("cantieri")
           .select(
-            "id, cliente, indirizzo, tipo_lavorazione, note, data_contratto, sopralluogo_fatto, merce_ordinata"
+            "id, cliente, indirizzo, tipo_lavorazione, note, data_contratto, data_posa_desiderata, sopralluogo_fatto, merce_ordinata"
           )
+          .order("data_posa_desiderata", { ascending: true, nullsFirst: false })
           .order("data_contratto", { ascending: true, nullsFirst: false }),
         supabase.from("assegnazioni").select("cantiere_id"),
       ]);
@@ -74,7 +78,8 @@ export default function DaAssegnarePage() {
       </div>
 
       <p className="mt-1 text-sm text-gray-500">
-        Cantieri senza nessun posatore assegnato. Dal più vecchio al più recente.
+        Cantieri senza nessun posatore assegnato. In cima i più urgenti, cioè quelli
+        con la posa desiderata più vicina. Quelli senza data desiderata stanno in fondo.
       </p>
 
       {errore && (
@@ -100,6 +105,18 @@ export default function DaAssegnarePage() {
               <p className="text-sm text-gray-500">
                 {[c.tipo_lavorazione, c.indirizzo].filter(Boolean).join(" · ") || "—"}
               </p>
+              {c.data_posa_desiderata ? (
+                <p className="mt-1 text-sm font-medium text-blue-800">
+                  Posa desiderata: {formatData(c.data_posa_desiderata)}{" "}
+                  <span className="text-xs font-normal text-gray-500">
+                    ({etichettaAttesa(c.data_posa_desiderata, oggi)})
+                  </span>
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-gray-400">
+                  Posa desiderata: non indicata
+                </p>
+              )}
               <p className="mt-0.5 text-xs text-gray-400">
                 Contratto: {formatData(c.data_contratto)}
               </p>
@@ -114,6 +131,16 @@ export default function DaAssegnarePage() {
       )}
     </main>
   );
+}
+
+// Testo breve che dice quanto manca alla posa desiderata.
+function etichettaAttesa(data: string, oggi: string): string {
+  const g = giorniTra(oggi, data);
+  if (g === 0) return "oggi";
+  if (g === 1) return "tra 1 giorno";
+  if (g > 1) return `tra ${g} giorni`;
+  if (g === -1) return "era ieri";
+  return `superata da ${-g} giorni`;
 }
 
 // Pallino di stato, solo da leggere: si accende dalla pagina Cantieri.

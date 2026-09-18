@@ -15,6 +15,7 @@ type Cantiere = {
   tipo_lavorazione: string | null;
   note: string | null;
   data_contratto: string | null;
+  data_posa_desiderata: string | null;
   sopralluogo_fatto: boolean;
   merce_ordinata: boolean;
 };
@@ -25,6 +26,7 @@ type FormCantiere = {
   tipo_lavorazione: string;
   riferimento_danea: string;
   data_contratto: string;
+  data_posa_desiderata: string;
   note: string;
 };
 
@@ -34,6 +36,7 @@ const formVuoto: FormCantiere = {
   tipo_lavorazione: "",
   riferimento_danea: "",
   data_contratto: "",
+  data_posa_desiderata: "",
   note: "",
 };
 
@@ -57,7 +60,7 @@ export default function CantieriPage() {
       supabase
         .from("cantieri")
         .select(
-          "id, cliente, riferimento_danea, indirizzo, tipo_lavorazione, note, data_contratto, sopralluogo_fatto, merce_ordinata"
+          "id, cliente, riferimento_danea, indirizzo, tipo_lavorazione, note, data_contratto, data_posa_desiderata, sopralluogo_fatto, merce_ordinata"
         )
         .order("data_contratto", { ascending: true, nullsFirst: false }),
       supabase
@@ -110,6 +113,7 @@ export default function CantieriPage() {
       tipo_lavorazione: c.tipo_lavorazione ?? "",
       riferimento_danea: c.riferimento_danea ?? "",
       data_contratto: c.data_contratto ?? "",
+      data_posa_desiderata: c.data_posa_desiderata ?? "",
       note: c.note ?? "",
     });
     setModifica(c.id);
@@ -132,6 +136,7 @@ export default function CantieriPage() {
       tipo_lavorazione: form.tipo_lavorazione.trim() || null,
       riferimento_danea: form.riferimento_danea.trim() || null,
       data_contratto: form.data_contratto || null,
+      data_posa_desiderata: form.data_posa_desiderata || null,
       note: form.note.trim() || null,
     };
 
@@ -232,6 +237,11 @@ export default function CantieriPage() {
                       Contratto: {formatData(c.data_contratto)}
                       {c.riferimento_danea ? ` · Danea: ${c.riferimento_danea}` : ""}
                     </p>
+                    {c.data_posa_desiderata && (
+                      <p className="mt-0.5 text-xs font-medium text-blue-700">
+                        Posa desiderata: {formatData(c.data_posa_desiderata)}
+                      </p>
+                    )}
                   </div>
                   <div className="flex shrink-0 gap-1">
                     {confermaId === c.id ? (
@@ -393,6 +403,19 @@ function PannelloForm({
             />
           </label>
         </div>
+
+        <label className="mt-3 block text-sm font-medium text-gray-700">
+          Posa desiderata dal cliente (indicativa)
+          <input
+            type="date"
+            value={form.data_posa_desiderata}
+            onChange={(e) => campo("data_posa_desiderata", e.target.value)}
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+          />
+          <span className="mt-1 block text-xs font-normal text-gray-500">
+            Serve a mettere in cima i clienti più urgenti nella pagina Da assegnare.
+          </span>
+        </label>
 
         <label className="mt-3 block text-sm font-medium text-gray-700">
           Indirizzo

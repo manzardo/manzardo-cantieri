@@ -7,7 +7,9 @@ import {
   addGiorni,
   giorniTra,
   isWeekend,
-  letteraGiorno,
+  isLunedi,
+  nomeMese,
+  siglaGiorno,
   lunediDellaSettimana,
   numeroGiorno,
   oggiISO,
@@ -305,11 +307,27 @@ export default function TimelinePage() {
     return [...m.values()].sort((x, y) => x.data.localeCompare(y.data));
   }, [assegnazioni, oggi]);
 
+  // Fasce dei mesi: quanti giorni consecutivi, fra quelli a video,
+  // appartengono allo stesso mese. Serve per la riga "OTTOBRE / NOVEMBRE".
+  const mesi = useMemo(() => {
+    const out: { etichetta: string; giorni: number }[] = [];
+    for (const g of giorni) {
+      const et = nomeMese(g);
+      const ultimo = out[out.length - 1];
+      if (ultimo && ultimo.etichetta === et) ultimo.giorni++;
+      else out.push({ etichetta: et, giorni: 1 });
+    }
+    return out;
+  }, [giorni]);
+
   const larghezzaGriglia = GIORNI_VISIBILI * CELLA;
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 p-3 sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      {/* Barra con titolo, frecce e ricerca: resta attaccata sotto al menu
+          anche scorrendo. Il 49px e' l'altezza del menu di navigazione. */}
+      <div className="sticky top-[49px] z-20 -mx-3 border-b border-gray-100 bg-white/95 px-3 pb-2 backdrop-blur sm:-mx-6 sm:px-6">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
         <h1 className="text-lg font-semibold text-gray-900">Timeline</h1>
         <div className="flex flex-wrap items-center gap-1">
           <button
@@ -356,6 +374,7 @@ export default function TimelinePage() {
         onCambia={setCerca}
         placeholder="Cerca un cliente o un artigiano…"
       />
+      </div>
 
       {errore && (
         <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -365,13 +384,13 @@ export default function TimelinePage() {
 
       {/* Riepilogo conflitti */}
       {conflitti.length > 0 && (
-        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          <p className="font-semibold">
+        <details className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          <summary className="cursor-pointer font-semibold">
             ⚠ {conflitti.length}{" "}
             {conflitti.length === 1
               ? "artigiano con sovrapposizioni"
               : "artigiani con sovrapposizioni"}
-          </p>
+          </summary>
           <ul className="mt-1 space-y-0.5">
             {conflitti.map((r) => (
               <li key={r.pos.id}>
@@ -388,18 +407,18 @@ export default function TimelinePage() {
               </li>
             ))}
           </ul>
-        </div>
+        </details>
       )}
 
       {/* Riepilogo avvisi: posa vicina con prerequisiti mancanti */}
       {avvisi.length > 0 && (
-        <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          <p className="font-semibold">
+        <details className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <summary className="cursor-pointer font-semibold">
             ⚠ {avvisi.length}{" "}
             {avvisi.length === 1
               ? "cantiere con posa vicina e prerequisiti mancanti"
               : "cantieri con posa vicina e prerequisiti mancanti"}
-          </p>
+          </summary>
           <ul className="mt-1 space-y-0.5">
             {avvisi.map((a) => (
               <li key={a.cliente + a.data}>
@@ -408,7 +427,7 @@ export default function TimelinePage() {
               </li>
             ))}
           </ul>
-        </div>
+        </details>
       )}
 
       {!pronto ? (
@@ -421,26 +440,51 @@ export default function TimelinePage() {
           4 settimane. Prova a spostarti avanti o indietro con le frecce.
         </p>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-gray-200 bg-white">
+        <div className="mt-4 max-h-[75vh] overflow-auto rounded-2xl border border-gray-200 bg-white">
           <div style={{ minWidth: NOME + larghezzaGriglia }}>
-            {/* Intestazione con i giorni */}
-            <div className="flex border-b border-gray-200">
+            {/* Intestazione (mesi + giorni): resta in vista scorrendo in basso */}
+            <div className="sticky top-0 z-30 bg-white shadow-sm">
+            {/* Fascia dei mesi */}
+            <div className="flex border-b border-gray-200 bg-gray-50">
               <div
-                className="sticky left-0 z-10 shrink-0 border-r border-gray-200 bg-gray-50"
+                className="sticky left-0 z-40 shrink-0 border-r border-gray-200 bg-gray-50"
                 style={{ width: NOME }}
               />
               <div className="flex">
-                {giorni.map((g) => (
+                {mesi.map((m, i) => (
+                  <div
+                    key={m.etichetta + i}
+                    className={
+                      "shrink-0 overflow-hidden whitespace-nowrap px-2 py-1 text-xs font-semibold uppercase tracking-wide text-gray-600 " +
+                      (i > 0 ? "border-l-2 border-l-gray-400" : "")
+                    }
+                    style={{ width: m.giorni * CELLA }}
+                  >
+                    {m.etichetta}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Riga dei giorni */}
+            <div className="flex border-b border-gray-200">
+              <div
+                className="sticky left-0 z-40 shrink-0 border-r border-gray-200 bg-gray-50"
+                style={{ width: NOME }}
+              />
+              <div className="flex">
+                {giorni.map((g, i) => (
                   <div
                     key={g}
                     className={
                       "shrink-0 border-r border-gray-100 py-1 text-center " +
+                      (i > 0 && isLunedi(g) ? "border-l-2 border-l-gray-400 " : "") +
                       (g === oggi ? "bg-blue-50" : isWeekend(g) ? "bg-gray-50" : "bg-white")
                     }
                     style={{ width: CELLA }}
                   >
                     <div className="text-[10px] uppercase text-gray-400">
-                      {letteraGiorno(g)}
+                      {siglaGiorno(g)}
                     </div>
                     <div
                       className={
@@ -453,6 +497,7 @@ export default function TimelinePage() {
                   </div>
                 ))}
               </div>
+            </div>
             </div>
 
             {/* Le righe, raggruppate per categoria di artigiano */}
@@ -491,11 +536,14 @@ export default function TimelinePage() {
                     >
                       {/* Sfondo: celle dei giorni */}
                       <div className="absolute inset-0 flex">
-                        {giorni.map((g) => (
+                        {giorni.map((g, i) => (
                           <div
                             key={g}
                             className={
                               "shrink-0 border-r border-gray-100 " +
+                              (i > 0 && isLunedi(g)
+                                ? "border-l-2 border-l-gray-400 "
+                                : "") +
                               (g === oggi
                                 ? "bg-blue-50/60"
                                 : isWeekend(g)

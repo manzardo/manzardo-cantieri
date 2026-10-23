@@ -56,10 +56,22 @@ export function isWeekend(iso: string): boolean {
   return g === 0 || g === 6;
 }
 
-// Etichetta breve del giorno della settimana: L M M G V S D.
-const LETTERE_GIORNI = ["D", "L", "M", "M", "G", "V", "S"];
-export function letteraGiorno(iso: string): string {
-  return LETTERE_GIORNI[isoToDate(iso).getDay()];
+// Sigla di due lettere del giorno della settimana: Lu Ma Me Gi Ve Sa Do.
+// Due lettere e non una perche' con una sola lettera martedì e mercoledì
+// erano tutti e due "M" e non si capiva piu' niente.
+const SIGLE_GIORNI = ["Do", "Lu", "Ma", "Me", "Gi", "Ve", "Sa"];
+export function siglaGiorno(iso: string): string {
+  return SIGLE_GIORNI[isoToDate(iso).getDay()];
+}
+
+// Nome del mese in italiano, tutto minuscolo. Es. "ottobre".
+export function nomeMese(iso: string): string {
+  return isoToDate(iso).toLocaleDateString("it-IT", { month: "long" });
+}
+
+// True se la data cade di lunedì, cioè se comincia una nuova settimana.
+export function isLunedi(iso: string): boolean {
+  return isoToDate(iso).getDay() === 1;
 }
 
 // Solo il numero del giorno del mese (1..31).

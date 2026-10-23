@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import Ricerca, { corrisponde } from "@/components/Ricerca";
 
 type Modifica = {
   id: string;
@@ -33,6 +34,7 @@ export default function StoricoPage() {
   const [modifiche, setModifiche] = useState<Modifica[]>([]);
   const [pronto, setPronto] = useState(false);
   const [errore, setErrore] = useState<string | null>(null);
+  const [cerca, setCerca] = useState("");
 
   useEffect(() => {
     let attivo = true;
@@ -54,16 +56,38 @@ export default function StoricoPage() {
     };
   }, []);
 
+  // Elenco filtrato dalla casella di ricerca.
+  const visibili = modifiche.filter((m) =>
+    corrisponde(
+      cerca,
+      m.assegnazioni?.cantieri?.cliente,
+      m.assegnazioni?.posatori?.nome,
+      m.motivo,
+      m.utente,
+      m.valore_precedente,
+      m.valore_nuovo
+    )
+  );
+
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 p-4 sm:p-6">
       <h1 className="text-lg font-semibold text-gray-900">
         Storico modifiche{" "}
-        <span className="text-gray-400">({modifiche.length})</span>
+        <span className="text-gray-400">
+          ({visibili.length}
+          {cerca.trim() !== "" ? ` di ${modifiche.length}` : ""})
+        </span>
       </h1>
       <p className="mt-1 text-sm text-gray-500">
         Ogni spostamento di un&apos;assegnazione viene registrato qui: chi, quando,
         da quando a quando, e il motivo.
       </p>
+
+      <Ricerca
+        valore={cerca}
+        onCambia={setCerca}
+        placeholder="Cerca per cliente, artigiano, motivo…"
+      />
 
       {errore && (
         <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -78,9 +102,13 @@ export default function StoricoPage() {
           Ancora nessuna modifica registrata. Sposta un&apos;assegnazione dalla
           timeline e comparirà qui.
         </p>
+      ) : visibili.length === 0 ? (
+        <p className="mt-6 rounded-2xl border border-dashed border-gray-200 p-6 text-center text-gray-500">
+          Nessuna modifica trovata per <b>{cerca}</b>.
+        </p>
       ) : (
         <ul className="mt-4 space-y-2">
-          {modifiche.map((m) => {
+          {visibili.map((m) => {
             const cliente = m.assegnazioni?.cantieri?.cliente ?? "Assegnazione rimossa";
             const posatore = m.assegnazioni?.posatori?.nome;
             const azione =

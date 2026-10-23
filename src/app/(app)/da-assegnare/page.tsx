@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { formatData, oggiISO, giorniTra } from "@/lib/date";
+import Ricerca, { corrisponde } from "@/components/Ricerca";
 
 // Pagina "Da assegnare": i cantieri che non hanno NESSUN posatore assegnato,
 // in nessuna data. Serve a non dimenticarsi di fissare gli artigiani.
@@ -25,6 +26,7 @@ export default function DaAssegnarePage() {
   const [cantieri, setCantieri] = useState<Cantiere[]>([]);
   const [errore, setErrore] = useState<string | null>(null);
   const [pronto, setPronto] = useState(false);
+  const [cerca, setCerca] = useState("");
 
   const oggi = oggiISO();
 
@@ -63,11 +65,20 @@ export default function DaAssegnarePage() {
     };
   }, []);
 
+  // Elenco filtrato dalla casella di ricerca.
+  const visibili = cantieri.filter((c) =>
+    corrisponde(cerca, c.cliente, c.indirizzo, c.tipo_lavorazione, c.note)
+  );
+
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 p-4 sm:p-6">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-lg font-semibold text-gray-900">
-          Da assegnare <span className="text-gray-400">({cantieri.length})</span>
+          Da assegnare{" "}
+          <span className="text-gray-400">
+            ({visibili.length}
+            {cerca.trim() !== "" ? ` di ${cantieri.length}` : ""})
+          </span>
         </h1>
         <Link
           href="/timeline"
@@ -82,6 +93,12 @@ export default function DaAssegnarePage() {
         con la posa desiderata più vicina. Quelli senza data desiderata stanno in fondo.
       </p>
 
+      <Ricerca
+        valore={cerca}
+        onCambia={setCerca}
+        placeholder="Cerca per cliente, indirizzo, lavorazione…"
+      />
+
       {errore && (
         <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
           {errore}
@@ -94,9 +111,13 @@ export default function DaAssegnarePage() {
         <p className="mt-6 rounded-2xl border border-dashed border-green-300 bg-green-50 p-6 text-center text-green-800">
           ✓ Tutti i cantieri hanno almeno un posatore assegnato.
         </p>
+      ) : visibili.length === 0 ? (
+        <p className="mt-6 rounded-2xl border border-dashed border-gray-200 p-6 text-center text-gray-500">
+          Nessun cantiere trovato per <b>{cerca}</b>.
+        </p>
       ) : (
         <ul className="mt-4 space-y-3">
-          {cantieri.map((c) => (
+          {visibili.map((c) => (
             <li
               key={c.id}
               className="rounded-2xl border border-amber-300 bg-white p-4 shadow-sm ring-1 ring-amber-200"

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import Ricerca, { corrisponde } from "@/components/Ricerca";
 import {
   addGiorni,
   giorniTra,
@@ -116,6 +117,7 @@ export default function TimelinePage() {
   const [pannello, setPannello] = useState<null | "cantiere" | "ferie">(null);
   const [dettaglio, setDettaglio] = useState<Impegno | null>(null);
   const [utente, setUtente] = useState<string>("");
+  const [cerca, setCerca] = useState("");
 
   const oggi = oggiISO();
   const fine = addGiorni(inizio, GIORNI_VISIBILI - 1);
@@ -242,10 +244,34 @@ export default function TimelinePage() {
 
   const conflitti = righe.filter((r) => r.rangeConflitti.length > 0);
 
+  // Ricerca: resta la riga di un artigiano se corrisponde il suo nome,
+  // la sua categoria, oppure il nome di un cantiere che ha in questo periodo.
+  const righeVisibili = useMemo(
+    () =>
+      righe.filter((r) =>
+        corrisponde(
+          cerca,
+          r.pos.nome,
+          r.pos.mestiere,
+          ...r.impegni.map((im) => im.etichetta)
+        )
+      ),
+    [righe, cerca]
+  );
+
+  // Se quello che hai scritto corrisponde a dei cantieri, gli altri blocchi
+  // si sbiadiscono per farti vedere subito dove sono quelli giusti.
+  const evidenziaBlocchi = useMemo(
+    () =>
+      cerca.trim() !== "" &&
+      righe.some((r) => r.impegni.some((im) => corrisponde(cerca, im.etichetta))),
+    [righe, cerca]
+  );
+
   // Le righe divise per categoria: piastrellisti insieme, muratori insieme, ecc.
   const gruppi = useMemo(() => {
     const mappa = new Map<string, Riga[]>();
-    for (const r of righe) {
+    for (const r of righeVisibili) {
       const m = r.pos.mestiere || "Da classificare";
       if (!mappa.has(m)) mappa.set(m, []);
       mappa.get(m)!.push(r);
@@ -257,7 +283,7 @@ export default function TimelinePage() {
           pesoMestiere(a.mestiere) - pesoMestiere(b.mestiere) ||
           a.mestiere.localeCompare(b.mestiere)
       );
-  }, [righe]);
+  }, [righeVisibili]);
 
   // Avvisi: cantieri con posa entro 20 giorni e sopralluogo/merce mancanti.
   const avvisi = useMemo(() => {
@@ -325,6 +351,12 @@ export default function TimelinePage() {
         {formatData(inizio)} – {formatData(fine)}
       </p>
 
+      <Ricerca
+        valore={cerca}
+        onCambia={setCerca}
+        placeholder="Cerca un cliente o un artigiano…"
+      />
+
       {errore && (
         <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
           {errore}
@@ -383,6 +415,11 @@ export default function TimelinePage() {
         <p className="mt-4 text-gray-500">Caricamento…</p>
       ) : posatori.length === 0 ? (
         <p className="mt-6 text-gray-500">Nessun posatore attivo.</p>
+      ) : righeVisibili.length === 0 ? (
+        <p className="mt-6 rounded-2xl border border-dashed border-gray-200 p-6 text-center text-gray-500">
+          Nessun artigiano o cantiere trovato per <b>{cerca}</b> in queste
+          4 settimane. Prova a spostarti avanti o indietro con le frecce.
+        </p>
       ) : (
         <div className="mt-4 overflow-x-auto rounded-2xl border border-gray-200 bg-white">
           <div style={{ minWidth: NOME + larghezzaGriglia }}>
@@ -483,7 +520,10 @@ export default function TimelinePage() {
                             title={`${im.etichetta} · ${formatData(im.data_inizio)} → ${formatData(im.data_fine)}`}
                             className={
                               "absolute overflow-hidden rounded-md px-1.5 text-left text-xs font-medium text-white shadow-sm transition hover:brightness-95 " +
-                              (im.rischio ? "ring-2 ring-amber-400" : "ring-1 ring-black/10")
+                              (im.rischio ? "ring-2 ring-amber-400" : "ring-1 ring-black/10") +
+                              (evidenziaBlocchi && !corrisponde(cerca, im.etichetta)
+                                ? " opacity-20"
+                                : "")
                             }
                             style={{
                               left: vsInizio * CELLA + 2,

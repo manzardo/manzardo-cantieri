@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import Ricerca, { corrisponde } from "@/components/Ricerca";
 
 // Stesso ordine delle categorie usato nella timeline.
 const ORDINE_MESTIERI = [
@@ -34,6 +35,7 @@ export default function PosatoriPage() {
   const [posatori, setPosatori] = useState<Posatore[]>([]);
   const [errore, setErrore] = useState<string | null>(null);
   const [pronto, setPronto] = useState(false);
+  const [cerca, setCerca] = useState("");
 
   useEffect(() => {
     let attivo = true;
@@ -52,10 +54,21 @@ export default function PosatoriPage() {
     };
   }, []);
 
+  // Elenco filtrato dalla casella di ricerca.
+  const visibili = posatori.filter((p) =>
+    corrisponde(
+      cerca,
+      p.nome,
+      p.mestiere,
+      p.telefono,
+      p.tipo === "interno" ? "interno" : "terzista"
+    )
+  );
+
   // Artigiani divisi per categoria (piastrellisti insieme, muratori insieme, ecc.)
   const gruppi = (() => {
     const mappa = new Map<string, Posatore[]>();
-    for (const p of posatori) {
+    for (const p of visibili) {
       const m = p.mestiere || "Da classificare";
       if (!mappa.has(m)) mappa.set(m, []);
       mappa.get(m)!.push(p);
@@ -73,8 +86,17 @@ export default function PosatoriPage() {
     <main className="mx-auto w-full max-w-3xl flex-1 p-4 sm:p-6">
       <h1 className="text-lg font-semibold text-gray-900">
         Artigiani / Posatori{" "}
-        <span className="text-gray-400">({posatori.length})</span>
+        <span className="text-gray-400">
+          ({visibili.length}
+          {cerca.trim() !== "" ? ` di ${posatori.length}` : ""})
+        </span>
       </h1>
+
+      <Ricerca
+        valore={cerca}
+        onCambia={setCerca}
+        placeholder="Cerca per nome, categoria, telefono…"
+      />
 
       {errore && (
         <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -84,6 +106,10 @@ export default function PosatoriPage() {
 
       {!pronto ? (
         <p className="mt-4 text-gray-500">Caricamento…</p>
+      ) : visibili.length === 0 ? (
+        <p className="mt-6 rounded-2xl border border-dashed border-gray-200 p-6 text-center text-gray-500">
+          Nessun artigiano trovato per <b>{cerca}</b>.
+        </p>
       ) : (
         <div className="mt-4 space-y-4">
           {gruppi.map((gr) => (

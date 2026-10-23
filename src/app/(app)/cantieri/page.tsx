@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import Ricerca, { corrisponde } from "@/components/Ricerca";
 import { formatData, oggiISO, addGiorni, giorniTra } from "@/lib/date";
 
 // Soglia dell'avviso automatico: posa entro N giorni con prerequisiti mancanti (§4.6).
@@ -51,6 +52,7 @@ export default function CantieriPage() {
   const [form, setForm] = useState<FormCantiere>(formVuoto);
   const [salvataggio, setSalvataggio] = useState(false);
   const [confermaId, setConfermaId] = useState<string | null>(null);
+  const [cerca, setCerca] = useState("");
 
   const oggi = oggiISO();
 
@@ -100,6 +102,18 @@ export default function CantieriPage() {
   }
 
   const conAvviso = cantieri.filter((c) => avviso(c) !== null);
+
+  // Elenco filtrato dalla casella di ricerca.
+  const visibili = cantieri.filter((c) =>
+    corrisponde(
+      cerca,
+      c.cliente,
+      c.indirizzo,
+      c.tipo_lavorazione,
+      c.riferimento_danea,
+      c.note
+    )
+  );
 
   function apriNuovo() {
     setForm(formVuoto);
@@ -182,7 +196,11 @@ export default function CantieriPage() {
     <main className="mx-auto w-full max-w-3xl flex-1 p-4 sm:p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">
-          Cantieri <span className="text-gray-400">({cantieri.length})</span>
+          Cantieri{" "}
+          <span className="text-gray-400">
+            ({visibili.length}
+            {cerca.trim() !== "" ? ` di ${cantieri.length}` : ""})
+          </span>
         </h1>
         <button
           onClick={apriNuovo}
@@ -191,6 +209,12 @@ export default function CantieriPage() {
           + Nuovo cantiere
         </button>
       </div>
+
+      <Ricerca
+        valore={cerca}
+        onCambia={setCerca}
+        placeholder="Cerca per cliente, indirizzo, lavorazione, Danea…"
+      />
 
       {errore && (
         <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -214,9 +238,13 @@ export default function CantieriPage() {
         <p className="mt-6 rounded-2xl border border-dashed border-gray-200 p-6 text-center text-gray-500">
           Nessun cantiere. Clicca <b>+ Nuovo cantiere</b> per aggiungere il primo.
         </p>
+      ) : visibili.length === 0 ? (
+        <p className="mt-6 rounded-2xl border border-dashed border-gray-200 p-6 text-center text-gray-500">
+          Nessun cantiere trovato per <b>{cerca}</b>.
+        </p>
       ) : (
         <ul className="mt-4 space-y-3">
-          {cantieri.map((c) => {
+          {visibili.map((c) => {
             const av = avviso(c);
             return (
               <li
